@@ -129,8 +129,8 @@
     <button class="btn-stop" id="stop-btn" onclick="stopWorkout()">🛑 Training abbrechen</button>
 </div>
 
-<audio id="music-summer" loop preload="auto" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
-<audio id="music-power" loop preload="auto" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"></audio>
+<audio id="music-summer" loop preload="auto" src="https://files.freemusicarchive.org/music/pop/The_Hobby_Beat/Dinosaur_Park/The_Hobby_Beat_-_01_-_Breathe.mp3"></audio>
+<audio id="music-power" loop preload="auto" src="https://files.freemusicarchive.org/music/disco/Funk_Industrial/The_Future_Is_Disco/Funk_Industrial_-_02_-_Funk_Funk.mp3"></audio>
 
 <script>
     let synth = window.speechSynthesis;
@@ -218,16 +218,17 @@
             visual.classList.remove('animate-exercise');
             visual.style.borderColor = 'var(--summer-orange)';
             
-            // Per Lautstärke steuern (umgeht die Handy-Sperre)
+            // Lighter and quieter music during running
             powerMusic.volume = 0;
-            summerMusic.volume = 0.15; // Angenehme Hintergrund-Lautstärke
+            summerMusic.volume = 0.08; // Decreased from 0.15
         } else {
             svg.innerHTML = icons.exercise;
             visual.classList.add('animate-exercise');
             visual.style.borderColor = 'var(--forest-green)';
             
+            // Pop/Disco music for exercises
             summerMusic.volume = 0;
-            powerMusic.volume = 0.2; // Etwas lauter für die Übung
+            powerMusic.volume = 0.15; // Decreased from 0.2
         }
     }
 
@@ -278,14 +279,12 @@
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
-        // Beide Songs SOFORT im Klick-Event starten (aber lautlos), damit das Handy sie freigibt
         const summerMusic = document.getElementById('music-summer');
         const powerMusic = document.getElementById('music-power');
         
         summerMusic.volume = 0;
         powerMusic.volume = 0;
         
-        // Play-Aufruf direkt hier erlaubt es dem Browser dauerhaft im Hintergrund abzuspielen
         summerMusic.play().catch(e => console.log("Audio-Aktivierung Fehlgeschlagen:", e));
         powerMusic.play().catch(e => console.log("Audio-Aktivierung Fehlgeschlagen:", e));
 
@@ -356,44 +355,4 @@
         powerMusic.currentTime = 0;
         
         document.getElementById('menu').style.display = 'block';
-        document.getElementById('nav-controls').style.display = 'none';
-        document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('status').innerText = "Wähle dein Training";
-        document.getElementById('timer').innerText = "00:00";
-    }
-
-    function setupLongPress(elementId, direction) {
-        const btn = document.getElementById(elementId);
-        let pressTimer;
-
-        const startPress = (e) => {
-            e.preventDefault();
-            btn.classList.add('holding');
-            btn.innerText = "⏳ Halten...";
-            
-            pressTimer = setTimeout(() => {
-                triggerSkip(direction);
-                endPress();
-            }, 2000);
-        };
-
-        const endPress = () => {
-            clearTimeout(pressTimer);
-            btn.classList.remove('holding');
-            btn.innerText = direction === 'next' ? '➡️ Weiter (2s)' : '⬅️ Zurück (2s)';
-        };
-
-        btn.addEventListener('mousedown', startPress);
-        btn.addEventListener('mouseup', endPress);
-        btn.addEventListener('mouseleave', endPress);
-
-        btn.addEventListener('touchstart', startPress, { passive: false });
-        btn.addEventListener('touchend', endPress);
-        btn.addEventListener('touchcancel', endPress);
-    }
-
-    setupLongPress('btn-prev', 'prev');
-    setupLongPress('btn-next', 'next');
-</script>
-</body>
-</html>
+        document.getElementById('nav-controls
