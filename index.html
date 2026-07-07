@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wald Workout Audio Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f1;
+            color: #2c3e50;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2e7d32; }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-setting { background-color: #4caf50; }
+        .btn-setting:hover { background-color: #43a047; }
+        .btn-stop { background-color: #d32f2f; display: none; }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 20px;
+            color: #388e3c;
+        }
+        #timer {
+            font-size: 40px;
+            margin: 10px 0;
+            color: #1e4620;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌲 Wald-Workout</h1>
+    <p>Kopfhörer aufsetzen, Setting wählen und Smartphone in die Tasche stecken!</p>
+    
+    <div id="menu">
+        <button class="btn-setting" onclick="startWorkout(1)">💪 Setting 1: Arme & Oberkörper</button>
+        <button class="btn-setting" onclick="startWorkout(2)">🧘 Setting 2: Rumpf & Rücken</button>
+        <button class="btn-setting" onclick="startWorkout(3)">🏃 Setting 3: Beine & Balance</button>
+    </div>
+
+    <div id="workout-screen">
+        <div id="status">Bereit...</div>
+        <div id="timer">00:00</div>
+        <button class="btn-stop" id="stop-btn" onclick="stopWorkout()">🛑 Workout abbrechen</button>
+    </div>
+</div>
+
+<script>
+    let synth = window.speechSynthesis;
+    let workoutActive = false;
+    let timerInterval;
+
+    // HINWEIS: Für Testzwecke sind die Laufpausen hier auf 10 Sekunden (statt 3-5 Min) gestellt. 
+    // Ändere die Zahlen bei "duration" einfach in 180 (für 3 Min) oder 300 (für 5 Min) für dein echtes Workout!
+    const workouts = {
+        1: [
+            { text: "Willkommen zum Oberkörper-Training. Wir starten mit 5 Minuten lockerem Einlaufen. Kreise deine Schultern.", duration: 10 },
+            { text: "Übung 1: Baum Liegestütze. 12 Wiederholungen am Baum. Los geht's.", duration: 20 },
+            { text: "Laufe jetzt für 3 Minuten locker weiter.", duration: 10 },
+            { text: "Übung 2: Das unsichtbare Band. Handflächen vor der Brust fest zusammendrücken. 20 Sekunden halten.", duration: 20 },
+            { text: "Und wieder 3 Minuten locker weiterlaufen.", duration: 10 },
+            { text: "Übung 3: Armkreisen mit Power. Arme seitlich ausstrecken und kreisen.", duration: 30 },
+            { text: "Geschafft. Laufe die letzten Minuten entspannt aus.", duration: 10 }
+        ],
+        2: [
+            { text: "Willkommen zum Rumpf-Training. 5 Minuten locker warm laufen.", duration: 10 },
+            { text: "Übung 1: Die Windmühle. Rumpfbeugen im Stehen, diagonal zu den Füßen.", duration: 45 },
+            { text: "3 Minuten lockere Laufpause.", duration: 10 },
+            { text: "Übung 2: Stehender Käfer. Ellenbogen zum diagonalen Knie führen.", duration: 40 },
+            { text: "3 Minuten weiterlaufen.", duration: 10 }
+        ],
+        3: [
+            { text: "Willkommen beim Beintraining. 5 Minuten locker einlaufen.", duration: 10 },
+            { text: "Übung 1: Wald-Kniebeugen. 15 Wiederholungen.", duration: 30 },
+            { text: "3 Minuten weiterlaufen.", duration: 10 },
+            { text: "Übung 2: Ausfallschritte auf der Stelle.", duration: 40 }
+        ]
+    };
+
+    function speak(text) {
+        return new Promise((resolve) => {
+            if (!workoutActive) return;
+            synth.cancel(); // Stoppe aktuelle Sprachausgabe
+            let utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'de-DE';
+            utterance.rate = 1.0; // Geschwindigkeit
+            utterance.onend = resolve;
+            synth.speak(utterance);
+        });
+    }
+
+    function startTimer(seconds) {
+        return new Promise((resolve) => {
+            let counter = seconds;
+            clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                if (!workoutActive) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+                let mins = Math.floor(counter / 60);
+                let secs = counter % 60;
+                document.getElementById('timer').innerText = 
+                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                
+                if (counter <= 0) {
+                    clearInterval(timerInterval);
+                    resolve();
+                }
+                counter--;
+            }, 1000);
+        });
+    }
+
+    async function startWorkout(id) {
+        workoutActive = true;
+        document.getElementById('stop-btn').style.display = 'block';
+        document.getElementById('menu').style.style = 'none';
+        
+        let steps = workouts[id];
+        
+        for (let step of steps) {
+            if (!workoutActive) break;
+            document.getElementById('status').innerText = "Stimme spricht...";
+            await speak(step.text);
+            
+            document.getElementById('status').innerText = "Aktion läuft / Pause...";
+            await startTimer(step.duration);
+        }
+        
+        if (workoutActive) {
+            await speak("Herzlichen Glückwunsch! Du hast das Workout erfolgreich beendet.");
+            stopWorkout();
+        }
+    }
+
+    function stopWorkout() {
+        workoutActive = false;
+        clearInterval(timerInterval);
+        synth.cancel();
+        document.getElementById('status').innerText = "Bereit...";
+        document.getElementById('timer').innerText = "00:00";
+        document.getElementById('stop-btn').style.display = 'none';
+    }
+</script>
+</body>
+</html>
