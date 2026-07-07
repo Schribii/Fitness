@@ -9,6 +9,7 @@
             --forest-green: #2e7d32;
             --summer-orange: #ff9800;
             --power-red: #d32f2f;
+            --nav-blue: #37474f;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -18,6 +19,8 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .container {
             width: 90%;
@@ -30,8 +33,8 @@
             text-align: center;
         }
         #visual-coach {
-            width: 200px;
-            height: 200px;
+            width: 180px;
+            height: 180px;
             margin: 20px auto;
             background: #f9f9f9;
             border-radius: 50%;
@@ -47,10 +50,11 @@
             margin: 10px 0;
         }
         .status-text {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 500;
             color: var(--forest-green);
             min-height: 3em;
+            padding: 0 10px;
         }
         button {
             width: 100%;
@@ -61,13 +65,31 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.1s;
+            transition: all 0.2s;
         }
         button:active { transform: scale(0.98); }
         .btn-start { background: var(--forest-green); color: white; }
         .btn-stop { background: var(--power-red); color: white; display: none; }
         
-        /* Animation für Übungen */
+        .nav-container {
+            display: none;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-nav {
+            background: var(--nav-blue);
+            color: white;
+            font-size: 15px;
+            padding: 12px;
+            flex: 1;
+        }
+        .btn-nav.holding {
+            background: #cfd8dc;
+            color: #37474f;
+            transform: scale(0.95);
+        }
+        
         @keyframes workout-move {
             0% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
@@ -99,54 +121,84 @@
         <button class="btn-start" onclick="startWorkout(3)">🏃 Beine & Balance</button>
     </div>
     
+    <div class="nav-container" id="nav-controls">
+        <button id="btn-prev" class="btn-nav">⬅️ Zurück (2s)</button>
+        <button id="btn-next" class="btn-nav">➡️ Weiter (2s)</button>
+    </div>
+
     <button class="btn-stop" id="stop-btn" onclick="stopWorkout()">🛑 Training abbrechen</button>
 </div>
 
-<audio id="music-summer" loop src="https://cdn.pixabay.com/audio/2022/05/27/audio_106651f496.mp3"></audio> <audio id="music-power" loop src="https://cdn.pixabay.com/audio/2021/11/23/audio_7809633e21.mp3"></audio> <script>
+<audio id="music-summer" loop preload="auto" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
+<audio id="music-power" loop preload="auto" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"></audio>
+
+<script>
     let synth = window.speechSynthesis;
     let workoutActive = false;
     let timerInterval;
-    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let audioCtx = null;
+    
+    let currentStepIndex = 0;
+    let steps = [];
+    let skipHappened = false;
+    let timerResolve = null;
+    let speakResolve = null;
 
     const icons = {
-        run: `<path d="M13 4v16M17 4v16M9 4v16M5 4v16" stroke="#ff9800"/>`, // Symbolisch für Bewegung
+        run: `<path d="M13 4v16M17 4v16M9 4v16M5 4v16" stroke="#ff9800"/>`,
         exercise: `<circle cx="12" cy="5" r="3"/><path d="M12 8v8M7 11h10M9 22l3-6 3 6" stroke="#2e7d32"/>`
     };
 
     const workouts = {
         1: [
             { type: 'run', text: "Locker einlaufen. 5 Minuten.", duration: 300 },
-            { type: 'ex', text: "Baum-Liegestütze. 12 Mal.", duration: 40 },
+            { type: 'ex', text: "Baum-Liegestütze. 12 Wiederholungen am Stamm.", duration: 40 },
             { type: 'run', text: "Pause. Laufe 3 Minuten weiter.", duration: 180 },
-            { type: 'ex', text: "Isometrisches Drücken. Hände zusammen pressen.", duration: 30 }
+            { type: 'ex', text: "Isometrisches Drücken. Handflächen fest zusammenpressen.", duration: 30 },
+            { type: 'run', text: "Laufe wieder 3 Minuten locker weiter.", duration: 180 },
+            { type: 'ex', text: "Armkreisen mit Power. Arme auf Schulterhöhe ausstrecken.", duration: 40 }
         ],
         2: [
-            { type: 'run', text: "Warm up. 5 Minuten.", duration: 300 },
-            { type: 'ex', text: "Die Windmühle. Rumpf beugen.", duration: 60 }
+            { type: 'run', text: "Warm up. 5 Minuten locker laufen.", duration: 300 },
+            { type: 'ex', text: "Die Windmühle. Rumpfbeugen im Stehen.", duration: 60 },
+            { type: 'run', text: "3 Minuten lockere Laufpause.", duration: 180 },
+            { type: 'ex', text: "Stehender Käfer. Ellenbogen zum Knie ziehen.", duration: 45 }
         ],
         3: [
-            { type: 'run', text: "Lauf los. 5 Minuten.", duration: 300 },
-            { type: 'ex', text: "Wald-Kniebeugen. Rücken gerade.", duration: 45 }
+            { type: 'run', text: "Lauf entspannt los. 5 Minuten.", duration: 300 },
+            { type: 'ex', text: "Wald-Kniebeugen. Tief gehen, Rücken gerade.", duration: 45 },
+            { type: 'run', text: "3 Minuten weiterlaufen.", duration: 180 },
+            { type: 'ex', text: "Ausfallschritte auf der Stelle.", duration: 45 }
         ]
     };
 
     function beep(freq, duration) {
+        if(!audioCtx) return;
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.frequency.value = freq;
-        gain.gain.value = 0.1;
+        gain.gain.value = 0.05;
         osc.start();
         setTimeout(() => osc.stop(), duration);
     }
 
     function speak(text) {
         return new Promise((resolve) => {
-            if (!workoutActive) return;
+            if (!workoutActive) { resolve(); return; }
+            speakResolve = resolve;
             let utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'de-DE';
-            utterance.onend = resolve;
+            
+            const finish = () => {
+                if (speakResolve) {
+                    speakResolve = null;
+                    resolve();
+                }
+            };
+            utterance.onend = finish;
+            utterance.onerror = finish;
             synth.speak(utterance);
         });
     }
@@ -156,84 +208,192 @@
         const status = document.getElementById('status');
         const visual = document.getElementById('visual-coach');
         
+        const summerMusic = document.getElementById('music-summer');
+        const powerMusic = document.getElementById('music-power');
+
         status.innerText = text;
+        
         if (type === 'run') {
             svg.innerHTML = icons.run;
             visual.classList.remove('animate-exercise');
             visual.style.borderColor = 'var(--summer-orange)';
-            document.getElementById('music-power').pause();
-            document.getElementById('music-summer').play();
+            
+            // Per Lautstärke steuern (umgeht die Handy-Sperre)
+            powerMusic.volume = 0;
+            summerMusic.volume = 0.15; // Angenehme Hintergrund-Lautstärke
         } else {
             svg.innerHTML = icons.exercise;
             visual.classList.add('animate-exercise');
             visual.style.borderColor = 'var(--forest-green)';
-            document.getElementById('music-summer').pause();
-            document.getElementById('music-power').play();
+            
+            summerMusic.volume = 0;
+            powerMusic.volume = 0.2; // Etwas lauter für die Übung
         }
     }
 
-    async function startTimer(seconds, type) {
+    function startTimer(seconds, type) {
         return new Promise((resolve) => {
+            timerResolve = resolve;
             let counter = seconds;
+            
+            let mins = Math.floor(counter / 60);
+            let secs = counter % 60;
+            document.getElementById('timer').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+            
             timerInterval = setInterval(() => {
-                if (!workoutActive) { clearInterval(timerInterval); return; }
+                if (!workoutActive) {
+                    clearInterval(timerInterval);
+                    if (timerResolve) { timerResolve = null; resolve(); }
+                    return;
+                }
                 
                 counter--;
                 let mins = Math.floor(counter / 60);
                 let secs = counter % 60;
                 document.getElementById('timer').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
 
-                // Minute Ansagen während dem Laufen
                 if (type === 'run' && counter > 0 && counter % 60 === 0) {
                     speak(`Noch ${counter / 60} Minuten laufen.`);
                 }
 
-                // Countdown Beeps
                 if (counter <= 30 && counter > 5 && counter % 5 === 0) {
-                    beep(440, 100); // Tiefer Beep alle 5 Sek
+                    beep(440, 100);
                 }
                 if (counter <= 5 && counter > 0) {
-                    beep(880, 100); // Hoher Beep jede Sekunde
+                    beep(880, 100);
                 }
 
                 if (counter <= 0) {
                     clearInterval(timerInterval);
-                    resolve();
+                    if (timerResolve) { timerResolve = null; resolve(); }
                 }
             }, 1000);
         });
     }
 
     async function startWorkout(id) {
+        // Audio-Kontext direkt beim Klick starten
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
         if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        // Beide Songs SOFORT im Klick-Event starten (aber lautlos), damit das Handy sie freigibt
+        const summerMusic = document.getElementById('music-summer');
+        const powerMusic = document.getElementById('music-power');
+        
+        summerMusic.volume = 0;
+        powerMusic.volume = 0;
+        
+        // Play-Aufruf direkt hier erlaubt es dem Browser dauerhaft im Hintergrund abzuspielen
+        summerMusic.play().catch(e => console.log("Audio-Aktivierung Fehlgeschlagen:", e));
+        powerMusic.play().catch(e => console.log("Audio-Aktivierung Fehlgeschlagen:", e));
+
         workoutActive = true;
+        currentStepIndex = 0;
+        steps = workouts[id];
+        
         document.getElementById('menu').style.display = 'none';
+        document.getElementById('nav-controls').style.display = 'flex';
         document.getElementById('stop-btn').style.display = 'block';
         
-        for (let step of workouts[id]) {
-            if (!workoutActive) break;
+        while (workoutActive && currentStepIndex < steps.length) {
+            skipHappened = false;
+            let step = steps[currentStepIndex];
+            
             updateUI(step.type, "Höre auf die Anweisung...");
             await speak(step.text);
-            updateUI(step.type, step.text);
-            await startTimer(step.duration, step.type);
+            
+            if (!skipHappened && workoutActive) {
+                updateUI(step.type, step.text);
+                await startTimer(step.duration, step.type);
+            }
+            
+            if (!skipHappened && workoutActive) {
+                currentStepIndex++;
+            }
         }
         
         if (workoutActive) {
-            speak("Training beendet. Gute Arbeit!");
+            updateUI('run', "Gute Arbeit!");
+            await speak("Herzlichen Glückwunsch! Du hast das gesamte Workout erfolgreich beendet.");
             stopWorkout();
         }
+    }
+
+    function triggerSkip(direction) {
+        if (!workoutActive) return;
+        skipHappened = true;
+        
+        clearInterval(timerInterval);
+        synth.cancel();
+        
+        if (direction === 'next') {
+            if (currentStepIndex < steps.length - 1) {
+                currentStepIndex++;
+            } else {
+                currentStepIndex = steps.length;
+            }
+        } else if (direction === 'prev') {
+            currentStepIndex = Math.max(0, currentStepIndex - 1);
+        }
+        
+        if (timerResolve) { let res = timerResolve; timerResolve = null; res(); }
+        if (speakResolve) { let res = speakResolve; speakResolve = null; res(); }
     }
 
     function stopWorkout() {
         workoutActive = false;
         clearInterval(timerInterval);
         synth.cancel();
-        document.getElementById('music-summer').pause();
-        document.getElementById('music-power').pause();
+        
+        const summerMusic = document.getElementById('music-summer');
+        const powerMusic = document.getElementById('music-power');
+        
+        summerMusic.pause();
+        powerMusic.pause();
+        summerMusic.currentTime = 0;
+        powerMusic.currentTime = 0;
+        
         document.getElementById('menu').style.display = 'block';
+        document.getElementById('nav-controls').style.display = 'none';
         document.getElementById('stop-btn').style.display = 'none';
         document.getElementById('status').innerText = "Wähle dein Training";
+        document.getElementById('timer').innerText = "00:00";
     }
+
+    function setupLongPress(elementId, direction) {
+        const btn = document.getElementById(elementId);
+        let pressTimer;
+
+        const startPress = (e) => {
+            e.preventDefault();
+            btn.classList.add('holding');
+            btn.innerText = "⏳ Halten...";
+            
+            pressTimer = setTimeout(() => {
+                triggerSkip(direction);
+                endPress();
+            }, 2000);
+        };
+
+        const endPress = () => {
+            clearTimeout(pressTimer);
+            btn.classList.remove('holding');
+            btn.innerText = direction === 'next' ? '➡️ Weiter (2s)' : '⬅️ Zurück (2s)';
+        };
+
+        btn.addEventListener('mousedown', startPress);
+        btn.addEventListener('mouseup', endPress);
+        btn.addEventListener('mouseleave', endPress);
+
+        btn.addEventListener('touchstart', startPress, { passive: false });
+        btn.addEventListener('touchend', endPress);
+        btn.addEventListener('touchcancel', endPress);
+    }
+
+    setupLongPress('btn-prev', 'prev');
+    setupLongPress('btn-next', 'next');
 </script>
 </body>
 </html>
