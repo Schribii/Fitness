@@ -3,158 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wald Workout Audio Guide</title>
+    <title>Wald Coach Pro</title>
     <style>
+        :root {
+            --forest-green: #2e7d32;
+            --summer-orange: #ff9800;
+            --power-red: #d32f2f;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f0f4f1;
-            color: #2c3e50;
-            text-align: center;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e8f5e9;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
         .container {
+            width: 90%;
             max-width: 500px;
-            margin: 0 auto;
             background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin: 20px;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
         }
-        h1 { color: #2e7d32; }
+        #visual-coach {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background: #f9f9f9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 5px solid var(--forest-green);
+        }
+        .timer-display {
+            font-size: 48px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+        .status-text {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--forest-green);
+            min-height: 3em;
+        }
         button {
-            display: block;
             width: 100%;
             padding: 15px;
-            margin: 15px 0;
+            margin: 10px 0;
+            border: none;
+            border-radius: 12px;
             font-size: 18px;
             font-weight: bold;
-            color: white;
-            border: none;
-            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: transform 0.1s;
         }
-        .btn-setting { background-color: #4caf50; }
-        .btn-setting:hover { background-color: #43a047; }
-        .btn-stop { background-color: #d32f2f; display: none; }
-        #status {
-            margin-top: 20px;
-            font-weight: bold;
-            font-size: 20px;
-            color: #388e3c;
+        button:active { transform: scale(0.98); }
+        .btn-start { background: var(--forest-green); color: white; }
+        .btn-stop { background: var(--power-red); color: white; display: none; }
+        
+        /* Animation für Übungen */
+        @keyframes workout-move {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0); }
         }
-        #timer {
-            font-size: 40px;
-            margin: 10px 0;
-            color: #1e4620;
-        }
+        .animate-exercise { animation: workout-move 2s infinite ease-in-out; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🌲 Wald-Workout</h1>
-    <p>Kopfhörer aufsetzen, Setting wählen und Smartphone in die Tasche stecken!</p>
+<div class="container" id="main-ui">
+    <h1 id="title">🌲 Wald Coach Pro</h1>
     
-    <div id="menu">
-        <button class="btn-setting" onclick="startWorkout(1)">💪 Setting 1: Arme & Oberkörper</button>
-        <button class="btn-setting" onclick="startWorkout(2)">🧘 Setting 2: Rumpf & Rücken</button>
-        <button class="btn-setting" onclick="startWorkout(3)">🏃 Setting 3: Beine & Balance</button>
+    <div id="visual-coach">
+        <svg id="coach-svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5" r="3"></circle>
+            <path d="M12 8v8"></path>
+            <path d="M7 11h10"></path>
+            <path d="M9 22l3-6 3 6"></path>
+        </svg>
     </div>
 
-    <div id="workout-screen">
-        <div id="status">Bereit...</div>
-        <div id="timer">00:00</div>
-        <button class="btn-stop" id="stop-btn" onclick="stopWorkout()">🛑 Workout abbrechen</button>
+    <div class="status-text" id="status">Wähle dein Training</div>
+    <div class="timer-display" id="timer">00:00</div>
+
+    <div id="menu">
+        <button class="btn-start" onclick="startWorkout(1)">💪 Arme & Oberkörper</button>
+        <button class="btn-start" onclick="startWorkout(2)">🧘 Rumpf & Rücken</button>
+        <button class="btn-start" onclick="startWorkout(3)">🏃 Beine & Balance</button>
     </div>
+    
+    <button class="btn-stop" id="stop-btn" onclick="stopWorkout()">🛑 Training abbrechen</button>
 </div>
 
-<script>
+<audio id="music-summer" loop src="https://cdn.pixabay.com/audio/2022/05/27/audio_106651f496.mp3"></audio> <audio id="music-power" loop src="https://cdn.pixabay.com/audio/2021/11/23/audio_7809633e21.mp3"></audio> <script>
     let synth = window.speechSynthesis;
     let workoutActive = false;
     let timerInterval;
+    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // HINWEIS: Für Testzwecke sind die Laufpausen hier auf 10 Sekunden (statt 3-5 Min) gestellt. 
-    // Ändere die Zahlen bei "duration" einfach in 180 (für 3 Min) oder 300 (für 5 Min) für dein echtes Workout!
+    const icons = {
+        run: `<path d="M13 4v16M17 4v16M9 4v16M5 4v16" stroke="#ff9800"/>`, // Symbolisch für Bewegung
+        exercise: `<circle cx="12" cy="5" r="3"/><path d="M12 8v8M7 11h10M9 22l3-6 3 6" stroke="#2e7d32"/>`
+    };
+
     const workouts = {
         1: [
-            { text: "Willkommen zum Oberkörper-Training. Wir starten mit 5 Minuten lockerem Einlaufen. Kreise deine Schultern.", duration: 10 },
-            { text: "Übung 1: Baum Liegestütze. 12 Wiederholungen am Baum. Los geht's.", duration: 20 },
-            { text: "Laufe jetzt für 3 Minuten locker weiter.", duration: 10 },
-            { text: "Übung 2: Das unsichtbare Band. Handflächen vor der Brust fest zusammendrücken. 20 Sekunden halten.", duration: 20 },
-            { text: "Und wieder 3 Minuten locker weiterlaufen.", duration: 10 },
-            { text: "Übung 3: Armkreisen mit Power. Arme seitlich ausstrecken und kreisen.", duration: 30 },
-            { text: "Geschafft. Laufe die letzten Minuten entspannt aus.", duration: 10 }
+            { type: 'run', text: "Locker einlaufen. 5 Minuten.", duration: 300 },
+            { type: 'ex', text: "Baum-Liegestütze. 12 Mal.", duration: 40 },
+            { type: 'run', text: "Pause. Laufe 3 Minuten weiter.", duration: 180 },
+            { type: 'ex', text: "Isometrisches Drücken. Hände zusammen pressen.", duration: 30 }
         ],
         2: [
-            { text: "Willkommen zum Rumpf-Training. 5 Minuten locker warm laufen.", duration: 10 },
-            { text: "Übung 1: Die Windmühle. Rumpfbeugen im Stehen, diagonal zu den Füßen.", duration: 45 },
-            { text: "3 Minuten lockere Laufpause.", duration: 10 },
-            { text: "Übung 2: Stehender Käfer. Ellenbogen zum diagonalen Knie führen.", duration: 40 },
-            { text: "3 Minuten weiterlaufen.", duration: 10 }
+            { type: 'run', text: "Warm up. 5 Minuten.", duration: 300 },
+            { type: 'ex', text: "Die Windmühle. Rumpf beugen.", duration: 60 }
         ],
         3: [
-            { text: "Willkommen beim Beintraining. 5 Minuten locker einlaufen.", duration: 10 },
-            { text: "Übung 1: Wald-Kniebeugen. 15 Wiederholungen.", duration: 30 },
-            { text: "3 Minuten weiterlaufen.", duration: 10 },
-            { text: "Übung 2: Ausfallschritte auf der Stelle.", duration: 40 }
+            { type: 'run', text: "Lauf los. 5 Minuten.", duration: 300 },
+            { type: 'ex', text: "Wald-Kniebeugen. Rücken gerade.", duration: 45 }
         ]
     };
+
+    function beep(freq, duration) {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = freq;
+        gain.gain.value = 0.1;
+        osc.start();
+        setTimeout(() => osc.stop(), duration);
+    }
 
     function speak(text) {
         return new Promise((resolve) => {
             if (!workoutActive) return;
-            synth.cancel(); // Stoppe aktuelle Sprachausgabe
             let utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'de-DE';
-            utterance.rate = 1.0; // Geschwindigkeit
             utterance.onend = resolve;
             synth.speak(utterance);
         });
     }
 
-    function startTimer(seconds) {
+    function updateUI(type, text) {
+        const svg = document.getElementById('coach-svg');
+        const status = document.getElementById('status');
+        const visual = document.getElementById('visual-coach');
+        
+        status.innerText = text;
+        if (type === 'run') {
+            svg.innerHTML = icons.run;
+            visual.classList.remove('animate-exercise');
+            visual.style.borderColor = 'var(--summer-orange)';
+            document.getElementById('music-power').pause();
+            document.getElementById('music-summer').play();
+        } else {
+            svg.innerHTML = icons.exercise;
+            visual.classList.add('animate-exercise');
+            visual.style.borderColor = 'var(--forest-green)';
+            document.getElementById('music-summer').pause();
+            document.getElementById('music-power').play();
+        }
+    }
+
+    async function startTimer(seconds, type) {
         return new Promise((resolve) => {
             let counter = seconds;
-            clearInterval(timerInterval);
-            
             timerInterval = setInterval(() => {
-                if (!workoutActive) {
-                    clearInterval(timerInterval);
-                    return;
-                }
+                if (!workoutActive) { clearInterval(timerInterval); return; }
+                
+                counter--;
                 let mins = Math.floor(counter / 60);
                 let secs = counter % 60;
-                document.getElementById('timer').innerText = 
-                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                
+                document.getElementById('timer').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+                // Minute Ansagen während dem Laufen
+                if (type === 'run' && counter > 0 && counter % 60 === 0) {
+                    speak(`Noch ${counter / 60} Minuten laufen.`);
+                }
+
+                // Countdown Beeps
+                if (counter <= 30 && counter > 5 && counter % 5 === 0) {
+                    beep(440, 100); // Tiefer Beep alle 5 Sek
+                }
+                if (counter <= 5 && counter > 0) {
+                    beep(880, 100); // Hoher Beep jede Sekunde
+                }
+
                 if (counter <= 0) {
                     clearInterval(timerInterval);
                     resolve();
                 }
-                counter--;
             }, 1000);
         });
     }
 
     async function startWorkout(id) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         workoutActive = true;
+        document.getElementById('menu').style.display = 'none';
         document.getElementById('stop-btn').style.display = 'block';
-        document.getElementById('menu').style.style = 'none';
         
-        let steps = workouts[id];
-        
-        for (let step of steps) {
+        for (let step of workouts[id]) {
             if (!workoutActive) break;
-            document.getElementById('status').innerText = "Stimme spricht...";
+            updateUI(step.type, "Höre auf die Anweisung...");
             await speak(step.text);
-            
-            document.getElementById('status').innerText = "Aktion läuft / Pause...";
-            await startTimer(step.duration);
+            updateUI(step.type, step.text);
+            await startTimer(step.duration, step.type);
         }
         
         if (workoutActive) {
-            await speak("Herzlichen Glückwunsch! Du hast das Workout erfolgreich beendet.");
+            speak("Training beendet. Gute Arbeit!");
             stopWorkout();
         }
     }
@@ -163,9 +228,11 @@
         workoutActive = false;
         clearInterval(timerInterval);
         synth.cancel();
-        document.getElementById('status').innerText = "Bereit...";
-        document.getElementById('timer').innerText = "00:00";
+        document.getElementById('music-summer').pause();
+        document.getElementById('music-power').pause();
+        document.getElementById('menu').style.display = 'block';
         document.getElementById('stop-btn').style.display = 'none';
+        document.getElementById('status').innerText = "Wähle dein Training";
     }
 </script>
 </body>
